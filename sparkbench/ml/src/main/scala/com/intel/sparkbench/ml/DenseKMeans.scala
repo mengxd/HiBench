@@ -18,21 +18,13 @@
 package com.intel.hibench.sparkbench.ml
 
 import org.apache.hadoop.io.LongWritable
-import org.apache.log4j.{Level, Logger}
 import org.apache.mahout.math.VectorWritable
-import org.apache.spark.mllib.clustering.KMeans
-import org.apache.spark.mllib.linalg.Vectors
-import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.ml.clustering.KMeans
+import org.apache.spark.ml.linalg.Vectors
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.storage.StorageLevel
 import scopt.OptionParser
 
-/**
- *
- * An example k-means app. Run with
- * {{{
- * ./bin/run-example org.apache.spark.examples.mllib.DenseKMeans [options] <input>
- * }}}
- * If you use it as a template to create your own app, please use `spark-submit` to submit your app.
- */
 object DenseKMeans {
 
   object InitializationMode extends Enumeration {
@@ -46,6 +38,7 @@ object DenseKMeans {
       input: String = null,
       k: Int = -1,
       numIterations: Int = 10,
+      storageLevel: String= "MEMORY_ONLY",
       initializationMode: InitializationMode = Parallel)
 
   def main(args: Array[String]) {
@@ -62,8 +55,11 @@ object DenseKMeans {
         .action((x, c) => c.copy(numIterations = x))
       opt[String]("initMode")
         .text(s"initialization mode (${InitializationMode.values.mkString(",")}), " +
-        s"default: ${defaultParams.initializationMode}")
+          s"default: ${defaultParams.initializationMode}")
         .action((x, c) => c.copy(initializationMode = InitializationMode.withName(x)))
+      opt[String]("storageLevel")
+        .text(s"storage level, default: ${defaultParams.storageLevel}")
+        .action((x, c) => c.copy(storageLevel = x))
       arg[String]("<input>")
         .text("input paths to examples")
         .required()
@@ -78,43 +74,49 @@ object DenseKMeans {
   }
 
   def run(params: Params) {
-    val conf = new SparkConf().setAppName(s"DenseKMeans with $params")
-    val sc = new SparkContext(conf)
+    val spark = SparkSession
+      .builder
+      .appName(s"DenseKMeans with $params")
+      .getOrCreate()
+    import spark.implicits._
 
-//    Logger.getRootLogger.setLevel(Level.WARN)
+    val sc = spark.sparkContext
+
+    val cacheStart = System.currentTimeMillis()
 
     val data = sc.sequenceFile[LongWritable, VectorWritable](params.input)
 
+    val storageLevel = StorageLevel.fromString(params.storageLevel)
     val examples = data.map { case (k, v) =>
-      var vector: Array[Double] = new Array[Double](v.get().size)
+      val vector: Array[Double] = new Array[Double](v.get().size)
       for (i <- 0 until v.get().size) vector(i) = v.get().get(i)
-      Vectors.dense(vector)
-    }.cache()
-
-//    val examples = sc.textFile(params.input).map { line =>
-//      Vectors.dense(line.split(' ').map(_.toDouble))
-//    }.cache()
+      // Should use Tuple1 to wrap around for calling toDF
+      Tuple1(Vectors.dense(vector))
+    }.toDF("features").persist(storageLevel)
 
     val numExamples = examples.count()
 
+    println(s"Loading data time (ms) = ${System.currentTimeMillis() - cacheStart}")
     println(s"numExamples = $numExamples.")
+    val trainingStart = System.currentTimeMillis()
 
     val initMode = params.initializationMode match {
-      case Random => KMeans.RANDOM
-      case Parallel => KMeans.K_MEANS_PARALLEL
+      case Random => "random"
+      case Parallel => "k-means||"
     }
 
     val model = new KMeans()
-      .setInitializationMode(initMode)
+      .setInitMode(initMode)
       .setK(params.k)
-      .setMaxIterations(params.numIterations)
-      .run(examples)
+      .setMaxIter(params.numIterations)
+      .setSeed(1L)
+      .fit(examples)
 
-    val cost = model.computeCost(examples)
+    val cost = model.summary.trainingCost
 
+    println(s"Training time (ms) = ${System.currentTimeMillis() - trainingStart}")
     println(s"Total cost = $cost.")
 
-    sc.stop()
+    spark.stop()
   }
 }
-

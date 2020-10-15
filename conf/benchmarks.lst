@@ -2,6 +2,7 @@ micro.sleep
 micro.sort
 micro.terasort
 micro.wordcount
+micro.repartition
 micro.dfsioe
 
 sql.aggregation
@@ -15,5 +16,13 @@ ml.bayes
 ml.kmeans
 ml.lr
 ml.als
+ml.pca
+ml.gbt
+ml.rf
+ml.svd
+ml.linear
+ml.lda
+ml.svm
+ml.gmm
 
 graph.nweight

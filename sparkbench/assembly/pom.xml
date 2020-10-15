@@ -6,7 +6,7 @@
   <parent>
     <groupId>com.intel.hibench</groupId>
     <artifactId>sparkbench</artifactId>
-    <version>6.1-SNAPSHOT</version>
+    <version>8.0-SNAPSHOT</version>
   </parent>
 
   <groupId>com.intel.hibench.sparkbench</groupId>
@@ -124,6 +124,17 @@
     </profile>
 
     <profile>
+      <id>dal</id>
+      <dependencies>
+        <dependency>
+          <groupId>com.intel.hibench.sparkbench</groupId>
+          <artifactId>sparkbench-dal</artifactId>
+          <version>${project.version}</version>
+        </dependency>
+      </dependencies>
+    </profile>
+
+    <profile>
       <id>allModules</id>
       <dependencies>
         <dependency>
@@ -149,11 +160,6 @@
         <dependency>
           <groupId>com.intel.hibench.sparkbench</groupId>
           <artifactId>sparkbench-sql</artifactId>
-          <version>${project.version}</version>
-        </dependency>
-        <dependency>
-          <groupId>com.intel.hibench.sparkbench</groupId>
-          <artifactId>sparkbench-streaming</artifactId>
           <version>${project.version}</version>
         </dependency>
       </dependencies>
